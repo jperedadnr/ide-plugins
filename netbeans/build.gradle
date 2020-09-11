@@ -1,7 +1,14 @@
-apply plugin: 'nbm'
+import java.time.Duration
+
+plugins {
+    id 'signing'
+    id 'cz.kubacki.nbm' version '1.17.0'
+    id 'io.codearte.nexus-staging' version '0.21.1'
+    id 'de.marcphilipp.nexus-publish' version '0.4.0'
+}
 
 group = 'com.gluonhq.plugin'
-version = '2.7.0'
+version = '2.8.1'
 
 ext.scriptFile = { String fileName ->
     new File(new File(rootDir, 'gradle'), fileName)
@@ -12,16 +19,32 @@ int javaVersion = 8
 
 configureJavaCompilers(javaVersion)
 
-String netbeansVersion = 'RELEASE80'
+String netbeansVersion = 'RELEASE110'
 
 repositories {
     mavenLocal()
     mavenCentral()
-    maven { url 'https://nexus.gluonhq.com/nexus/content/repositories/releases/' }
     maven { url 'http://bits.netbeans.org/nexus/content/groups/netbeans' }
     maven { url 'http://bits.netbeans.org/maven2/' }
-    maven { url 'https://repo.gradle.org/gradle/libs-releases-local' }
-    maven { url 'https://dl.bintray.com/kelemen/maven' }
+    maven { url 'https://nexus.gluonhq.com/nexus/content/repositories/releases/' }
+    maven { 
+        url 'https://nexus.gluonhq.com/nexus/content/repositories/snapshots/'
+        credentials {
+            username = gluonNexusUsername
+            password = gluonNexusPassword
+        }
+    }
+}
+
+def tryGetProperty = {String name, String defaultValue ->
+    if (!project.hasProperty(name)) {
+        return defaultValue
+    }
+    return project.property(name)?.toString()
+}
+
+clean {
+    delete "${rootDir}/sandbox"
 }
 
 compileJava {
@@ -29,25 +52,27 @@ compileJava {
     options.compilerArgs = ['-Xlint', '-sourcepath', resDirsPath]
 }
 
-def tryGetProperty = {String name, String defaultValue ->
-    if (!project.hasProperty(name)) {
-        return defaultValue
-    }
-
-    return project.property(name)?.toString()
-}
-
 nbm {
     moduleName = 'com.gluon.plugin.netbeans'
     localizingBundle = 'com/gluonhq/plugin/netbeans/Bundle.properties'
+    licenseFile = "${project.rootDir}/license.txt"
 
-    requires('cnb.org.netbeans.gradle.project')
+    ext.isReleaseVersion = !version.endsWith("SNAPSHOT")
+    // TODO: Uncomment once signing key is available
+    /*if (isReleaseVersion) {
+        keyStore {
+            keyStoreFile = file('keystore')
+            username = 'gluon'
+            password = tryGetProperty('gluonPluginKeyStorePass', '')
+        }
+    }*/
+}
 
-    keyStore {
-        keyStoreFile = file('keystore')
-        username = 'gluon'
-        password = tryGetProperty('gluonPluginKeyStorePass', '')
-    }
+task nbmRelease(type: Copy) {
+    dependsOn 'nbm'
+    from "$buildDir/nbm"
+    into "$buildDir/libs"
+    rename "com-gluon-plugin-netbeans.nbm", "com-gluon-plugin-netbeans-${project.version}.nbm"
 }
 
 def netbeansModule = { String groupName, String moduleName ->
@@ -71,6 +96,7 @@ dependencies {
     providedCompile netbeansApi('org-netbeans-modules-editor-lib2')
     providedCompile netbeansApi('org-netbeans-modules-editor-mimelookup')
     providedCompile netbeansApi('org-netbeans-modules-java-source')
+    providedCompile netbeansApi('org-netbeans-modules-gradle-java')
     providedCompile netbeansApi('org-netbeans-libs-javacapi')
     providedCompile netbeansApi('org-openide-awt')
     providedCompile netbeansApi('org-openide-dialogs')
@@ -82,9 +108,7 @@ dependencies {
     providedCompile netbeansApi('org-openide-util-lookup')
     providedCompile files(findToolsJar(javaVersion))
 
-    providedCompile 'com.github.kelemen:netbeans-gradle-plugin:1.4.2'
-
-    compile 'com.gluonhq:ide-plugin-templates:2.9.0'
+    compile 'com.gluonhq:ide-plugin-templates:2.10.1'
     compile 'org.apache.logging.log4j:log4j-1.2-api:2.5'
 }
 
@@ -117,4 +141,73 @@ task netBeansRun(type: Exec) {
         logger.warn('netBeansInstallDir property is not specified. Assuming \'netbeans\' executable is on PATH.')
     }
     commandLine executable, '--userdir', "testuserdir"
+}
+
+task sourcesJar(type: Jar) {
+    from sourceSets.main.allJava
+    classifier = 'sources'
+}
+
+def nbmFile = file("$buildDir/libs/com-gluon-plugin-netbeans-${project.version}.nbm")
+def nbmArtifact = artifacts.add('archives', nbmFile) {
+    type 'nbm'
+    builtBy 'nbmRelease'
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            artifactId = "${project.group}".replace(".", "-") + "-netbeans"
+            from components.java
+            artifact sourcesJar
+            artifact nbmArtifact
+            pom {
+                name = 'Gluon Plugin for NetBeans'
+                description = ' Gluon Plugin allows developers to create Java applications and their native images targeting Android, iOS, Linux, MacOS and Windows platforms using the same codebase.'
+                url = 'https://github.com/gluonhq/ide-plugins'
+                licenses {
+                    license {
+                        name = 'BSD 3-clause "New" or "Revised" license'
+                        url = 'https://choosealicense.com/licenses/bsd-3-clause/'
+                    }
+                }
+                developers {
+                    developer {
+                        name = 'Joeri Sykora'
+                        email = 'joeri.sykora@gluonhq.com'
+                    }
+                    developer {
+                        name = 'Abhinay Agarwal'
+                        email = 'abhinay.agarwal@gluonhq.com'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:git://github.com:gluonhq/ide-plugins.git'
+                    developerConnection = 'scm:git:ssh://github.com:gluonhq/ide-plugins.git'
+                    url = 'https://github.com/gluonhq/ide-plugins'
+                }
+            }
+        }
+    }
+}
+
+signing {
+    required = { gradle.taskGraph.hasTask(publish) && !version.endsWith("SNAPSHOT") }
+    sign publishing.publications.maven
+}
+
+nexusPublishing {
+    repositories {
+        sonatype()
+    }
+    // credentials are shared from staging plugin
+    clientTimeout = Duration.ofMinutes(5)
+    connectTimeout = Duration.ofMinutes(5)
+}
+
+nexusStaging {
+    username = project.hasProperty('sonatypeUsername') ? project.property('sonatypeUsername') : ''
+    password = project.hasProperty('sonatypePassword') ? project.property('sonatypePassword') : ''
+    numberOfRetries = 30
+    delayBetweenRetriesInMillis = 5000
 }

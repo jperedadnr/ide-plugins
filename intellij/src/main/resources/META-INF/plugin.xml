@@ -1,28 +1,32 @@
-<idea-plugin version="2">
+<idea-plugin>
     <id>com.gluonhq.plugin.intellij</id>
-    <name>Gluon Plugin</name>
-    <version>2.7.0</version>
+    <name>Gluon</name>
+    <version>2.8.3</version>
     <vendor email="support@gluonhq.com" url="http://gluonhq.com">Gluon</vendor>
 
     <description><![CDATA[
-      The Gluon Plugin allows developers to create Java applications that target the Android and iOS mobile platforms as well as the Desktop platform using the same codebase.
+      Gluon allows developers to create Java applications and their native images targeting Android, iOS, Linux, MacOS and Windows platforms using the same codebase.
     ]]></description>
 
     <change-notes><![CDATA[
-      <b>2.7.0</b>
+      <b>2.8.3</b>
       <ul>
-      <li>Update templates for Gluon Mobile 5</li>
+      <li>Add Gluon Client support</li>
+      <li>Update templates to use Gluon Mobile 6</li>
+      <li>Plugin can be used to create projects with either Maven or Gradle build tool</li>
       </ul>
     ]]>
     </change-notes>
 
     <!-- please see https://confluence.jetbrains.com/display/IDEADEV/Build+Number+Ranges for description -->
-    <idea-version since-build="131"/>
+    <idea-version since-build="202"/>
 
     <!-- please see https://confluence.jetbrains.com/display/IDEADEV/Plugin+Compatibility+with+IntelliJ+Platform+Products
          on how to target different products -->
     <depends>com.intellij.modules.lang</depends>
     <depends>org.jetbrains.plugins.gradle</depends>
+    <depends>com.intellij.modules.java</depends>
+    <depends>com.intellij.javafx</depends>
 
     <extensions defaultExtensionNs="com.intellij">
         <projectTemplatesFactory implementation="com.gluonhq.plugin.intellij.module.GluonProjectTemplatesFactory"/>
@@ -47,7 +51,7 @@
             <action id="UploadConfig" class="com.gluonhq.plugin.intellij.menu.function.UploadGluonFunctionAction"
                     text="Upload Gluon Function" description="Upload Gluon Function"/>
             <separator />
-            <action id="DownConfig" class="com.gluonhq.plugin.intellij.menu.down.GluonMobileSettingsAction"
+            <action id="AttachConfig" class="com.gluonhq.plugin.intellij.menu.down.GluonMobileSettingsAction"
                     text="Gluon Mobile" description="Edit Gluon Mobile settings"/>
             <action id="CloudLinkConfig" class="com.gluonhq.plugin.intellij.menu.cloudlink.GluonCloudLinkSettingsAction"
                     text="Gluon CloudLink" description="Edit Gluon CloudLink settings"/>
